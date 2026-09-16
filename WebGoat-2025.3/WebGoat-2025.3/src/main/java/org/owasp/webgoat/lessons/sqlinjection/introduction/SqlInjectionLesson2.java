@@ -39,56 +39,27 @@ public class SqlInjectionLesson2 implements AssignmentEndpoint {
 
   @PostMapping("/SqlInjection/attack2")
   @ResponseBody
-public AttackResult completed(@RequestParam String department) {
-  return injectableQuery(department);
-}
-
-protected AttackResult injectableQuery(String department) {
-
-  String query =
-      "SELECT * FROM employees WHERE department = ?";
-
-  try (Connection connection = dataSource.getConnection();
-       PreparedStatement preparedStatement =
-           connection.prepareStatement(
-               query,
-               TYPE_SCROLL_INSENSITIVE,
-               CONCUR_READ_ONLY)) {
-
-    preparedStatement.setString(1, department);
-
-    ResultSet results = preparedStatement.executeQuery();
-
-    StringBuilder output = new StringBuilder();
-
-    if (results.first()) {
-
-      if ("Marketing".equals(results.getString("department"))) {
-
-        output.append("<span class='feedback-positive'>");
-        output.append("Safe query executed.");
-        output.append("</span>");
-
-        output.append(SqlInjectionLesson8.generateTable(results));
-
-        return success(this)
-            .feedback("sql-injection.2.success")
-            .output(output.toString())
-            .build();
-      }
-    }
-
-    return failed(this)
-        .feedback("sql-injection.2.failed")
-        .output("No matching results.")
-        .build();
-
-  } catch (SQLException sqle) {
-
-    return failed(this)
-        .feedback("sql-injection.2.failed")
-        .output(sqle.getMessage())
-        .build();
+  public AttackResult completed(@RequestParam String query) {
+    return injectableQuery(query);
   }
-}
+
+  protected AttackResult injectableQuery(String query) {
+    try (var connection = dataSource.getConnection()) {
+      Statement statement = connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY);
+      ResultSet results = statement.executeQuery(query);
+      StringBuilder output = new StringBuilder();
+
+      results.first();
+
+      if (results.getString("department").equals("Marketing")) {
+        output.append("<span class='feedback-positive'>" + query + "</span>");
+        output.append(SqlInjectionLesson8.generateTable(results));
+        return success(this).feedback("sql-injection.2.success").output(output.toString()).build();
+      } else {
+        return failed(this).feedback("sql-injection.2.failed").output(output.toString()).build();
+      }
+    } catch (SQLException sqle) {
+      return failed(this).feedback("sql-injection.2.failed").output(sqle.getMessage()).build();
+    }
+  }
 }

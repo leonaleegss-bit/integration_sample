@@ -43,52 +43,33 @@ public class ContentTypeAssignment implements AssignmentEndpoint {
   }
 
   @PostMapping(path = "xxe/content-type")
-@ResponseBody
-public AttackResult createNewUser(
-    @RequestBody String commentStr,
-    @RequestHeader(value = "Content-Type", required = false) String contentType,
-    @CurrentUser WebGoatUser user) {
+  @ResponseBody
+  public AttackResult createNewUser(
+      @RequestBody String commentStr,
+      @RequestHeader("Content-Type") String contentType,
+      @CurrentUser WebGoatUser user) {
+    AttackResult attackResult = failed(this).build();
 
-  AttackResult attackResult = failed(this).build();
-
-  if (MediaType.APPLICATION_JSON_VALUE.equalsIgnoreCase(contentType)) {
-
-    parseJson(commentStr)
-        .ifPresent(c -> comments.addComment(c, user, true));
-
-    return failed(this)
-        .feedback("xxe.content.type.feedback.json")
-        .build();
-  }
-
-  if (MediaType.APPLICATION_XML_VALUE.equalsIgnoreCase(contentType)
-      || MediaType.TEXT_XML_VALUE.equalsIgnoreCase(contentType)) {
-
-    try {
-
-      Comment comment = comments.parseSecureXml(commentStr);
-
-      comments.addComment(comment, user, false);
-
-      if (checkSolution(comment)) {
-        return success(this).build();
-      }
-
-      return failed(this).build();
-
-    } catch (Exception e) {
-
-      return failed(this)
-          .feedback("Invalid XML")
-          .output(e.getMessage())
-          .build();
+    if (APPLICATION_JSON_VALUE.equals(contentType)) {
+      parseJson(commentStr).ifPresent(c -> comments.addComment(c, user, true));
+      attackResult = failed(this).feedback("xxe.content.type.feedback.json").build();
     }
-  }
 
-  return failed(this)
-      .feedback("Unsupported Content-Type")
-      .build();
-}
+    if (null != contentType && contentType.contains(MediaType.APPLICATION_XML_VALUE)) {
+      try {
+        Comment comment = comments.parseXml(commentStr, false);
+        comments.addComment(comment, user, false);
+        if (checkSolution(comment)) {
+          attackResult = success(this).build();
+        }
+      } catch (Exception e) {
+        String error = ExceptionUtils.getStackTrace(e);
+        attackResult = failed(this).feedback("xxe.content.type.feedback.xml").output(error).build();
+      }
+    }
+
+    return attackResult;
+  }
 
   protected Optional<Comment> parseJson(String comment) {
     ObjectMapper mapper = new ObjectMapper();

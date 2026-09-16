@@ -36,76 +36,55 @@ public class SqlInjectionLesson5a implements AssignmentEndpoint {
 
   @PostMapping("/SqlInjection/assignment5a")
   @ResponseBody
-public AttackResult completed(
-    @RequestParam String account,
-    @RequestParam String operator,
-    @RequestParam String injection) {
+  public AttackResult completed(
+      @RequestParam String account, @RequestParam String operator, @RequestParam String injection) {
+    return injectableQuery(account + " " + operator + " " + injection);
+  }
 
-  // 保留原本組合邏輯
-  String accountName = account + " " + operator + " " + injection;
+  protected AttackResult injectableQuery(String accountName) {
+    String query = "";
+    try (Connection connection = dataSource.getConnection()) {
+      query =
+          "SELECT * FROM user_data WHERE first_name = 'John' and last_name = '" + accountName + "'";
+      try (Statement statement =
+          connection.createStatement(
+              ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE)) {
+        ResultSet results = statement.executeQuery(query);
 
-  return injectableQuery(accountName);
-}
+        if ((results != null) && (results.first())) {
+          ResultSetMetaData resultsMetaData = results.getMetaData();
+          StringBuilder output = new StringBuilder();
 
-protected AttackResult injectableQuery(String accountName) {
+          output.append(writeTable(results, resultsMetaData));
+          results.last();
 
-  String query =
-      "SELECT * FROM user_data WHERE first_name = ? AND last_name = ?";
-
-  try (Connection connection = dataSource.getConnection();
-       PreparedStatement preparedStatement = connection.prepareStatement(
-           query,
-           ResultSet.TYPE_SCROLL_INSENSITIVE,
-           ResultSet.CONCUR_UPDATABLE)) {
-
-    // 使用參數化查詢
-    preparedStatement.setString(1, "John");
-    preparedStatement.setString(2, accountName);
-
-    try (ResultSet results = preparedStatement.executeQuery()) {
-
-      if ((results != null) && (results.first())) {
-
-        ResultSetMetaData resultsMetaData = results.getMetaData();
-        StringBuilder output = new StringBuilder();
-
-        output.append(writeTable(results, resultsMetaData));
-        results.last();
-
-        if (results.getRow() >= 6) {
-          return success(this)
-              .feedback("sql-injection.5a.success")
-              .output("Query executed safely using PreparedStatement." + EXPLANATION)
-              .feedbackArgs(output.toString())
-              .build();
+          // If they get back more than one user they succeeded
+          if (results.getRow() >= 6) {
+            return success(this)
+                .feedback("sql-injection.5a.success")
+                .output("Your query was: " + query + EXPLANATION)
+                .feedbackArgs(output.toString())
+                .build();
+          } else {
+            return failed(this).output(output.toString() + "<br> Your query was: " + query).build();
+          }
         } else {
           return failed(this)
-              .output(output.toString() + "<br> Query executed safely.")
+              .feedback("sql-injection.5a.no.results")
+              .output("Your query was: " + query)
               .build();
         }
-
-      } else {
-
-        return failed(this)
-            .feedback("sql-injection.5a.no.results")
-            .output("No results found.")
-            .build();
+      } catch (SQLException sqle) {
+        return failed(this).output(sqle.getMessage() + "<br> Your query was: " + query).build();
       }
-
-    } catch (SQLException sqle) {
-
+    } catch (Exception e) {
       return failed(this)
-          .output(sqle.getMessage())
+          .output(
+              this.getClass().getName() + " : " + e.getMessage() + "<br> Your query was: " + query)
           .build();
     }
-
-  } catch (Exception e) {
-
-    return failed(this)
-        .output(this.getClass().getName() + " : " + e.getMessage())
-        .build();
   }
-}
+
   public static String writeTable(ResultSet results, ResultSetMetaData resultsMetaData)
       throws SQLException {
     int numColumns = resultsMetaData.getColumnCount();

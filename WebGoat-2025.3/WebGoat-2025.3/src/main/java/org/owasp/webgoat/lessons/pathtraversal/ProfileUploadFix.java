@@ -32,55 +32,16 @@ public class ProfileUploadFix extends ProfileUploadBase {
   }
 
   @PostMapping(
-    value = "/PathTraversal/profile-upload-fix",
-    consumes = ALL_VALUE,
-    produces = APPLICATION_JSON_VALUE)
-@ResponseBody
-public AttackResult uploadFileHandler(
-    @RequestParam("uploadedFileFix") MultipartFile file,
-    @RequestParam(value = "fullNameFix", required = false) String fullName,
-    @CurrentUsername String username) {
-
-  try {
-
-    // 預設檔名
-    String safeFileName = "default";
-
-    if (fullName != null && !fullName.isBlank()) {
-
-      // 只允許英數、底線、減號
-      if (!fullName.matches("[a-zA-Z0-9_-]+")) {
-        return failed(this)
-            .feedback("Invalid file name")
-            .build();
-      }
-
-      safeFileName = fullName;
-    }
-
-    // 建立安全路徑
-    Path uploadDir = Paths.get("uploads").toAbsolutePath().normalize();
-
-    Path targetPath =
-        uploadDir.resolve(safeFileName).normalize();
-
-    // 防止跳出 uploads 目錄
-    if (!targetPath.startsWith(uploadDir)) {
-      return failed(this)
-          .feedback("Path traversal detected")
-          .build();
-    }
-
-    // 執行原本邏輯
-    return super.execute(file, safeFileName, username);
-
-  } catch (Exception e) {
-
-    return failed(this)
-        .output(e.getMessage())
-        .build();
+      value = "/PathTraversal/profile-upload-fix",
+      consumes = ALL_VALUE,
+      produces = APPLICATION_JSON_VALUE)
+  @ResponseBody
+  public AttackResult uploadFileHandler(
+      @RequestParam("uploadedFileFix") MultipartFile file,
+      @RequestParam(value = "fullNameFix", required = false) String fullName,
+      @CurrentUsername String username) {
+    return super.execute(file, fullName != null ? fullName.replace("../", "") : "", username);
   }
-}
 
   @GetMapping("/PathTraversal/profile-picture-fix")
   @ResponseBody

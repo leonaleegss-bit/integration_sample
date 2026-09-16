@@ -10,7 +10,6 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -42,22 +41,18 @@ public class SqlInjectionLesson4 implements AssignmentEndpoint {
 
   protected AttackResult injectableQuery(String query) {
     try (Connection connection = dataSource.getConnection()) {
-      try (PreparedStatement statement =
-          connection.prepareStatement("UPDATE employees SET phone = ?")) {
-        statement.setString(1, query);
-        statement.executeUpdate();
+      try (Statement statement =
+          connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY)) {
+        statement.executeUpdate(query);
         connection.commit();
-        try (Statement selectStatement =
-            connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY);
-            ResultSet results = selectStatement.executeQuery("SELECT phone from employees;")) {
-          StringBuilder output = new StringBuilder();
-          // user completes lesson if column phone exists
-          if (results.first()) {
-            output.append("<span class='feedback-positive'>" + query + "</span>");
-            return success(this).output(output.toString()).build();
-          } else {
-            return failed(this).output(output.toString()).build();
-          }
+        ResultSet results = statement.executeQuery("SELECT phone from employees;");
+        StringBuilder output = new StringBuilder();
+        // user completes lesson if column phone exists
+        if (results.first()) {
+          output.append("<span class='feedback-positive'>" + query + "</span>");
+          return success(this).output(output.toString()).build();
+        } else {
+          return failed(this).output(output.toString()).build();
         }
       } catch (SQLException sqle) {
         return failed(this).output(sqle.getMessage()).build();

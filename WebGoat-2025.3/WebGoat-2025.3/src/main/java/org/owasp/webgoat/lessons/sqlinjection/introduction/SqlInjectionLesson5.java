@@ -53,15 +53,16 @@ public class SqlInjectionLesson5 implements AssignmentEndpoint {
   @PostMapping("/SqlInjection/attack5")
   @ResponseBody
   public AttackResult completed(String query) {
+    createUser();
     return injectableQuery(query);
   }
 
   protected AttackResult injectableQuery(String query) {
     try (Connection connection = dataSource.getConnection()) {
-      String sql = "GRANT SELECT ON GRANT_RIGHTS TO ?";
-      try (var statement = connection.prepareStatement(sql)) {
-        statement.setString(1, query.toUpperCase());
-        statement.execute();
+      try (Statement statement =
+          connection.createStatement(
+              ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE)) {
+        statement.executeQuery(query);
         if (checkSolution(connection)) {
           return success(this).build();
         }

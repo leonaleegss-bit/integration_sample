@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.ModelAndView;
-import org.springframework.web.util.HtmlUtils;
 
 /**
  * @author nbaars
@@ -44,7 +43,7 @@ public class LandingAssignment implements AssignmentEndpoint {
   public ModelAndView openPasswordReset(@CurrentUsername String username) {
     ModelAndView modelAndView = new ModelAndView();
     modelAndView.addObject(
-        "webwolfLandingPageUrl", landingPHtmlUtils.htmlEscape(StringUtils.reverse(username)"/landing"));
+        "webwolfLandingPageUrl", landingPageUrl.replace("//landing", "/landing"));
     modelAndView.addObject("uniqueCode", StringUtils.reverse(username));
 
     modelAndView.setViewName("lessons/webwolfintroduction/templates/webwolfPasswordReset.html");
