@@ -1,0 +1,90 @@
+/*
+ * SPDX-FileCopyrightText: Copyright © 2020 WebGoat authors
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+package org.owasp.webgoat.lessons.pathtraversal;
+
+import static org.springframework.http.MediaType.ALL_VALUE;
+import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
+
+import org.owasp.webgoat.container.CurrentUsername;
+import org.owasp.webgoat.container.assignments.AssignmentHints;
+import org.owasp.webgoat.container.assignments.AttackResult;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+@RestController
+@AssignmentHints({
+  "path-traversal-profile-fix.hint1",
+  "path-traversal-profile-fix.hint2",
+  "path-traversal-profile-fix.hint3"
+})
+public class ProfileUploadFix extends ProfileUploadBase {
+
+  public ProfileUploadFix(@Value("${webgoat.server.directory}") String webGoatHomeDirectory) {
+    super(webGoatHomeDirectory);
+  }
+
+  @PostMapping(
+    value = "/PathTraversal/profile-upload-fix",
+    consumes = ALL_VALUE,
+    produces = APPLICATION_JSON_VALUE)
+@ResponseBody
+public AttackResult uploadFileHandler(
+    @RequestParam("uploadedFileFix") MultipartFile file,
+    @RequestParam(value = "fullNameFix", required = false) String fullName,
+    @CurrentUsername String username) {
+
+  try {
+
+    // 預設檔名
+    String safeFileName = "default";
+
+    if (fullName != null && !fullName.isBlank()) {
+
+      // 只允許英數、底線、減號
+      if (!fullName.matches("[a-zA-Z0-9_-]+")) {
+        return failed(this)
+            .feedback("Invalid file name")
+            .build();
+      }
+
+      safeFileName = fullName;
+    }
+
+    // 建立安全路徑
+    Path uploadDir = Paths.get("uploads").toAbsolutePath().normalize();
+
+    Path targetPath =
+        uploadDir.resolve(safeFileName).normalize();
+
+    // 防止跳出 uploads 目錄
+    if (!targetPath.startsWith(uploadDir)) {
+      return failed(this)
+          .feedback("Path traversal detected")
+          .build();
+    }
+
+    // 執行原本邏輯
+    return super.execute(file, safeFileName, username);
+
+  } catch (Exception e) {
+
+    return failed(this)
+        .output(e.getMessage())
+        .build();
+  }
+}
+
+  @GetMapping("/PathTraversal/profile-picture-fix")
+  @ResponseBody
+  public ResponseEntity<?> getProfilePicture(@CurrentUsername String username) {
+    return super.getProfilePicture(username);
+  }
+}
